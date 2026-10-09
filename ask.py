@@ -27,8 +27,8 @@ conn.row_factory = sqlite3.Row
 where, params = [], []
 for word in q.split():
     if len(word) >= 4 and not word.startswith("--"):
-        where.append("(m.subject LIKE ? OR p.email_address LIKE ? OR mb.body_text LIKE ?)")
-        params += [f"%{word}%"] * 3
+        where.append("(LOWER(m.subject) LIKE ? OR LOWER(p.email_address) LIKE ? OR LOWER(mb.body_text) LIKE ?)")
+        params += [f"%{word.lower()}%"] * 3
 if date_from: where.append("m.sent_at >= ?"); params.append(date_from)
 if date_to:   where.append("m.sent_at <= ?"); params.append(date_to + " 23:59:59")
 sql = """SELECT DISTINCT m.sent_at, p.email_address AS sender, m.subject, m.snippet
