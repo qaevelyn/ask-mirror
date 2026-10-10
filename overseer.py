@@ -59,3 +59,38 @@ def w4_sql():
                 hits.append((f"[EMAIL {r['sent_at'][:10]} | {r['subject']}] {full}",))
     return list(set(hits))[:4]
 
+
+def main():
+    print(f"=== OVERSEER: dispatching '{Q[:60]}' to 4 workers ===")
+    results = []
+    results += worker("W1-deepseek", w1_deepseek)
+    results += worker("W2-emails", w2_emails)
+    results += worker("W3-working", w3_working)
+    results += worker("W4-sql", w4_sql)
+
+    seen, verified = set(), []
+    for hit in results:
+        key = hit[0][:100]
+        if key not in seen:
+            seen.add(key)
+            verified.append(hit)
+    print(f"=== OVERSEER: {len(verified)} verified chunks after dedupe ===")
+
+    context = "\n\n".join(h[0] if isinstance(h[0], str) else str(h[0]) for h in verified)
+    print("=== GENERATION (granite4.1:3b, grounded) ===")
+    r = requests.post(OLLAMA+"/api/generate", timeout=600, json={
+        "model": "granite4.1:3b",
+        "prompt": "You are a grounded assistant. Use ONLY the context. If not in context, reply exactly: NOT IN CORPUS. Cite source titles.\n\nCONTEXT:\n" + context + "\n\nQUESTION: " + Q,
+        "stream": False})
+    answer = r.json()["response"]
+    full_out = answer + "\n\n" + "="*60 + "\nFULL DOCUMENTS DELIVERED (paged — space to advance, q to quit):\n" + "="*60 + "\n" + context
+    import pydoc
+    pydoc.pager(full_out)
+
+    log_entry["verified_chunks"] = len(verified)
+    with open(LOG, "a") as f:
+        f.write(json.dumps(log_entry) + "\n")
+    print(f"=== PRODUCTIVITY LOGGED: {LOG} ===")
+
+if __name__ == "__main__":
+    main()
