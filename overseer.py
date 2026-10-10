@@ -48,39 +48,14 @@ def w4_sql():
     hits = []
     for word in Q.split():
         if len(word) >= 4:
-            for r in conn.execute("""SELECT m.sent_at, p.email_address AS sender, m.subject
-                FROM messages m LEFT JOIN participants p ON p.id=m.sender_id
-                LEFT JOIN message_bodies mb ON mb.message_id=m.id
+            for r in conn.execute(
+                """SELECT m.sent_at, p.email_address AS sender, m.subject, mb.body_text
+                FROM messages m LEFT JOIN participants p ON p.id = m.sender_id
+                LEFT JOIN message_bodies mb ON mb.message_id = m.id
                 WHERE LOWER(m.subject) LIKE ? OR LOWER(mb.body_text) LIKE ?
                 ORDER BY m.sent_at DESC LIMIT 3""",
                 (f"%{word.lower()}%", f"%{word.lower()}%")):
-                body = (r['body_text'] or '')[:800]
-                hits.append((f"[EMAIL {r['sent_at'][:10]} | {r['subject']}] {body}",))
-    return list(set(hits))[:6]
+                full = r["body_text"] or ""
+                hits.append((f"[EMAIL {r['sent_at'][:10]} | {r['subject']}] {full}",))
+    return list(set(hits))[:4]
 
-print(f"=== OVERSEER: dispatching '{Q[:60]}' to 4 workers ===")
-results = []
-results += worker("W1-deepseek", w1_deepseek)
-results += worker("W2-emails", w2_emails)
-results += worker("W3-working", w3_working)
-results += worker("W4-sql", w4_sql)
-
-# OVERSEER: dedupe + grounding verification
-seen, verified = set(), []
-for hit in results:
-    key = hit[0][:100]
-    if key not in seen:
-        seen.add(key); verified.append(hit)
-print(f"=== OVERSEER: {len(verified)} verified chunks after dedupe ===")
-
-context = "\n\n".join(h[0] if isinstance(h[0], str) else str(h[0]) for h in verified)
-print("=== GENERATION (granite4.1:3b, grounded) ===")
-r = requests.post(OLLAMA+"/api/generate", timeout=600, json={
-    "model": "granite4.1:3b",
-    "prompt": f"You are a grounded assistant. Use ONLY the context. If not in context, reply exactly: NOT IN CORPUS. Cite source titles.\n\nCONTEXT:\n{context}\n\nQUESTION: {Q}",
-    "stream": False})
-print(r.json()["response"])
-
-log_entry["verified_chunks"] = len(verified)
-with open(LOG, "a") as f: f.write(json.dumps(log_entry) + "\n")
-print(f"\n=== PRODUCTIVITY LOGGED: {LOG} ===")
