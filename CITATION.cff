@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: "A Mirror of My Becoming™ — ask / getdoc™"
+type: software
+authors:
+  - family-names: Caro
+    given-names: Evelyn
+    email: evelyn.caro.cloud@gmail.com
+    orcid: "https://orcid.org/0009-0007-3295-3147"
+repository-code: "https://github.com/qaevelyn/ask-mirror"
+license: AGPL-3.0
+version: v4
+date-released: "2026-10-11"
